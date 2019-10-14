@@ -235,10 +235,18 @@ sphereShader =
         uniform vec2  resolution;
 
         const vec3 lightDir = vec3(-0.577, 0.577, 0.577);
+        const float PI = 3.14159265;
+        const float fov = 60.0 * 0.5 * PI / 180.0;
+
+
         const float sphereSize = 1.0; // 球の半径
 
+        vec3 trans(vec3 p){
+            return mod(p, 5.0) - 2.5;
+        }
+
         float distanceFunc(vec3 p){
-            return length(p) - sphereSize;
+            return length(trans(p)) - sphereSize;
         }
 
         vec3 getNormal(vec3 p){
@@ -255,18 +263,14 @@ sphereShader =
             vec2 p = (gl_FragCoord.xy * 2.0 - resolution) / min(resolution.x, resolution.y);
 
             // camera
-            vec3 cPos = vec3(0.0,  0.0,  3.0); // カメラの位置
-            vec3 cDir = vec3(0.0,  0.0, -1.0); // カメラの向き(視線)
-            vec3 cUp  = vec3(0.0,  1.0,  0.0); // カメラの上方向
-            vec3 cSide = cross(cDir, cUp);     // 外積を使って横方向を算出
-            float targetDepth = 1.0;           // フォーカスする深度
+            vec3 cPos = vec3(0.0,  0.0,  2.0); // カメラの位置
 
             // ray
-            vec3 ray = normalize(cSide * p.x + cUp * p.y + cDir * targetDepth);
+            vec3 ray = normalize(vec3(sin(fov) * p.x, sin(fov) * p.y, -cos(fov)));
 
             // marching loop
             vec3  rPos = cPos;    // レイの先端位置
-            for (int i = 0; i < 16; i++) {
+            for (int i = 0; i < 64; i++) {
                 float distance = distanceFunc(rPos);
                 if (distance < 0.001) {
                     vec3 normal = getNormal(rPos);
