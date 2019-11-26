@@ -238,20 +238,24 @@ fragmentShader =
         const float PI = 3.14159265;
         const float fov = 120.0 * 0.5 * PI / 180.0;
 
-        vec3 trans(vec3 p){
-            return mod(p, 4.0) - 2.0;
+
+        // torus distance function
+        float distFuncTorus(vec3 p){
+            vec2 t = vec2(0.75, 0.25);
+            vec2 r = vec2(length(p.xy) - t.x, p.z);
+            return length(r) - t.y;
         }
 
-        float sphereDF(vec3 p, vec3 center, float size){
-            return length(p - center) - size;
+        // floor distance function
+        float distFuncFloor(vec3 p){
+            return dot(p, vec3(0.0, 1.0, 0.0)) + 1.0;
         }
 
-        float boxDF(vec3 p, vec3 center, vec3 size){
-            return length(max(abs(p - center) - size, 0.0));
-        }
-
+        // distance function
         float distanceFunc(vec3 p){
-            return sphereDF(p, vec3(0.0, 2.0, 0.0), 1.0);
+            float d1 = distFuncTorus(p);
+            float d2 = distFuncFloor(p);
+            return min(d1, d2);
         }
 
         vec3 getNormal(vec3 p){
@@ -268,27 +272,21 @@ fragmentShader =
             vec2 p = (gl_FragCoord.xy * 2.0 - resolution) / min(resolution.x, resolution.y);
 
             // camera
-            vec3 cPos = vec3(0.0,  0.0,  2.0); // カメラの位置
+            vec3 cPos = vec3(0.0,  0.0,  3.0); // カメラの位置
 
             // ray
             vec3 ray = normalize(vec3(sin(fov) * p.x, sin(fov) * p.y, -cos(fov)));
 
             // marching loop
-            vec3  rPos = cPos;    // レイの先端位置
-            for (int i = 0; i < 64; i++) {
-                float distance = distanceFunc(rPos);
-                if (distance < 0.001) {
-                    vec3 normal = getNormal(rPos);
-                    float diff = clamp(dot(lightDir, normal), 0.1, 1.0);
-                    gl_FragColor = vec4(vec3(diff), 1.0);
-                    return;
-                }
-                rPos +=  ray * distance;
+            vec3  dPos = cPos;    // レイの先端位置
+            for (int i = 0; i < 256; i++) {
+                float distance = distanceFunc(dPos);
+                dPos +=  ray * distance;
             }
 
             // hit check
-            if (distanceFunc(rPos) < 0.001) {
-                vec3 normal = getNormal(rPos);
+            if (distanceFunc(dPos) < 0.001) {
+                vec3 normal = getNormal(dPos);
                 float diff = clamp(dot(lightDir, normal), 0.1, 1.0);
                 gl_FragColor = vec4(vec3(diff), 1.0);
             }
