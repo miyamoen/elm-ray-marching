@@ -1,4 +1,4 @@
-module Main exposing (main)
+module Main exposing (..)
 
 {- -}
 
@@ -103,7 +103,7 @@ view model =
                         ]
                         [ WebGL.entity
                             vertexShader
-                            sphereShader
+                            fragmentShader
                             mesh
                             { time = model.currentTime
                             , mouse = model.mouse
@@ -225,8 +225,8 @@ testShader =
     |]
 
 
-sphereShader : Shader {} Uniforms {}
-sphereShader =
+fragmentShader : Shader {} Uniforms {}
+fragmentShader =
     [glsl|
         precision mediump float;
 
@@ -236,17 +236,22 @@ sphereShader =
 
         const vec3 lightDir = vec3(-0.577, 0.577, 0.577);
         const float PI = 3.14159265;
-        const float fov = 60.0 * 0.5 * PI / 180.0;
-
-
-        const float sphereSize = 1.0; // 球の半径
+        const float fov = 120.0 * 0.5 * PI / 180.0;
 
         vec3 trans(vec3 p){
-            return mod(p, 5.0) - 2.5;
+            return mod(p, 4.0) - 2.0;
+        }
+
+        float sphereDF(vec3 p, vec3 center, float size){
+            return length(p - center) - size;
+        }
+
+        float boxDF(vec3 p, vec3 center, vec3 size){
+            return length(max(abs(p - center) - size, 0.0));
         }
 
         float distanceFunc(vec3 p){
-            return length(trans(p)) - sphereSize;
+            return sphereDF(p, vec3(0.0, 2.0, 0.0), 1.0);
         }
 
         vec3 getNormal(vec3 p){
