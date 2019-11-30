@@ -266,7 +266,7 @@ fragmentShader =
 
         // floor distance function
         float distFuncFloor(vec3 p){
-            return dot(p, vec3(0.0, 1.0, 0.0)) + 1.0;
+            return dot(p, vec3(0.0, 1.0, 0.0)) + 3.0;
         }
 
         // box distance function
@@ -292,7 +292,8 @@ fragmentShader =
             float d1 = distFuncTorus(q, vec2(1.5, 0.25));
             float d2 = distFuncBox(q);
             float d3 = distFuncCylinder(q, vec2(0.75, 0.25));
-            return smoothMin(smoothMin(d1, d2, 16.0), d3, 16.0);
+            float d4 = distFuncFloor(p);
+            return min(smoothMin(smoothMin(d1, d2, 16.0), d3, 16.0), d4);
         }
 
         vec3 getNormal(vec3 p){
@@ -309,7 +310,7 @@ fragmentShader =
             vec2 p = (gl_FragCoord.xy * 2.0 - resolution) / min(resolution.x, resolution.y);
 
             // camera
-            vec3 cPos = vec3(0.0,  0.0,  3.0); // カメラの位置
+            vec3 cPos = vec3(0.0,  5.0,  5.0); // カメラの位置
 
             // ray
             vec3 ray = normalize(vec3(sin(fov) * p.x, sin(fov) * p.y, -cos(fov)));
@@ -318,13 +319,21 @@ fragmentShader =
             vec3  dPos = cPos;    // レイの先端位置
             for (int i = 0; i < 256; i++) {
                 float distance = distFunc(dPos);
-                dPos +=  ray * distance;
+                if (distance < 0.001) { break; }
+                dPos +=  ray * distance * 0.7;
             }
 
             // hit check
             if (distFunc(dPos) < 0.001) {
                 vec3 normal = getNormal(dPos);
                 float diff = clamp(dot(lightDir, normal), 0.1, 1.0);
+
+                float u = 1.0 - floor(mod(dPos.x, 2.0));
+                float v = 1.0 - floor(mod(dPos.z, 2.0));
+                if ((u == 1.0 && v < 1.0) || (u < 1.0 && v == 1.0)) {
+                    diff *= 0.7;
+                }
+
                 gl_FragColor = vec4(vec3(diff), 1.0);
             }
         }
