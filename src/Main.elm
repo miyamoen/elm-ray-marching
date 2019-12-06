@@ -19,7 +19,7 @@ import WebGL exposing (Mesh, Shader)
 
 size : number
 size =
-    512
+    600
 
 
 main : Program () Model Msg
@@ -98,7 +98,7 @@ view model =
                         [ HAttrs.width size
                         , HAttrs.height size
                         , HAttrs.style "display" "block"
-                        , HAttrs.style "width" "300px"
+                        , HAttrs.style "width" "600px"
                         , Html.Events.on "mousemove" <| mouseDecoder MoveMouse
                         ]
                         [ WebGL.entity
@@ -196,145 +196,116 @@ vertexShader =
     |]
 
 
-testShader : Shader {} Uniforms {}
-testShader =
-    [glsl|
-        precision mediump float;
-
-        uniform float time;
-        uniform vec2  mouse;
-        uniform vec2  resolution;
-
-        void main(void) {
-            // fragment position
-            vec2 p = (gl_FragCoord.xy * 2.0 - resolution) / min(resolution.x, resolution.y);
-
-            // camera
-            vec3 cPos = vec3(0.0,  0.0,  3.0); // カメラの位置
-            vec3 cDir = vec3(0.0,  0.0, -1.0); // カメラの向き(視線)
-            vec3 cUp  = vec3(0.0,  1.0,  0.0); // カメラの上方向
-            vec3 cSide = cross(cDir, cUp);     // 外積を使って横方向を算出
-            float targetDepth = 0.2;           // フォーカスする深度
-
-            // ray
-            vec3 ray = normalize(cSide * p.x + cUp * p.y + cDir * targetDepth);
-
-            // color
-            gl_FragColor = vec4(ray.xy, -ray.z, 1.0);
-        }
-    |]
 
 
 fragmentShader : Shader {} Uniforms {}
 fragmentShader =
     [glsl|
-        precision mediump float;
+precision mediump float;
 
-        uniform float time;
-        uniform vec2  mouse;
-        uniform vec2  resolution;
+uniform float time;
+uniform vec2  mouse;
+uniform vec2  resolution;
 
-        const vec3 lightDir = vec3(-0.577, 0.577, 0.577);
-        const float PI = 3.14159265;
-        const float fov = 120.0 * 0.5 * PI / 180.0;
+const float PI = 3.14159265;
+const float fov = 120.0 * 0.5 * PI / 180.0;
 
-        // rotate
-        vec3 rotate(vec3 p, float angle, vec3 axis){
-            vec3 a = normalize(axis);
-            float s = sin(angle);
-            float c = cos(angle);
-            float r = 1.0 - c;
-            mat3 m = mat3(
-                a.x * a.x * r + c,
-                a.y * a.x * r + a.z * s,
-                a.z * a.x * r - a.y * s,
-                a.x * a.y * r - a.z * s,
-                a.y * a.y * r + c,
-                a.z * a.y * r + a.x * s,
-                a.x * a.z * r + a.y * s,
-                a.y * a.z * r - a.x * s,
-                a.z * a.z * r + c
-            );
-            return m * p;
-        }
+// rotate
+vec3 rotate(vec3 p, float angle, vec3 axis){
+    vec3 a = normalize(axis);
+    float s = sin(angle);
+    float c = cos(angle);
+    float r = 1.0 - c;
+    mat3 m = mat3(
+        a.x * a.x * r + c,
+        a.y * a.x * r + a.z * s,
+        a.z * a.x * r - a.y * s,
+        a.x * a.y * r - a.z * s,
+        a.y * a.y * r + c,
+        a.z * a.y * r + a.x * s,
+        a.x * a.z * r + a.y * s,
+        a.y * a.z * r - a.x * s,
+        a.z * a.z * r + c
+    );
+    return m * p;
+}
 
-        // smoothing min
-        float smoothMin(float d1, float d2, float k){
-            float h = exp(-k * d1) + exp(-k * d2);
-            return -log(h) / k;
-        }
+// smoothing min
+float smoothMin(float d1, float d2, float k){
+    float h = exp(-k * d1) + exp(-k * d2);
+    return -log(h) / k;
+}
 
-        // floor distance function
-        float distFuncFloor(vec3 p){
-            return dot(p, vec3(0.0, 1.0, 0.0)) + 3.0;
-        }
+// floor distance function
+float distFuncFloor(vec3 p){
+    return dot(p, vec3(0.0, 1.0, 0.0)) + 3.0;
+}
 
-        // box distance function
-        float distFuncBox(vec3 p){
-            return length(max(abs(p) - vec3(2.0, 0.1, 0.5), 0.0)) - 0.1;
-        }
+// box distance function
+float distFuncBox(vec3 p){
+    return length(max(abs(p) - vec3(2.0, 0.1, 0.5), 0.0)) - 0.1;
+}
 
-        // torus distance function
-        float distFuncTorus(vec3 p, vec2 r){
-          vec2 d = vec2(length(p.xy) - r.x, p.z);
-          return length(d) - r.y;
-        }
+// torus distance function
+float distFuncTorus(vec3 p, vec2 r){
+    vec2 d = vec2(length(p.xy) - r.x, p.z);
+    return length(d) - r.y;
+}
 
-        // cylinder
-        float distFuncCylinder(vec3 p, vec2 r){
-            vec2 d = abs(vec2(length(p.xy), p.z)) - r;
-            return min(max(d.x, d.y), 0.0) + length(max(d, 0.0)) - 0.1;
-        }
+// cylinder
+float distFuncCylinder(vec3 p, vec2 r){
+    vec2 d = abs(vec2(length(p.xy), p.z)) - r;
+    return min(max(d.x, d.y), 0.0) + length(max(d, 0.0)) - 0.1;
+}
 
-        // distance function
-        float distFunc(vec3 p){
-            vec3 q = rotate(p, radians(time * 10.0), vec3(1.0, 0.5, 0.0));
-            float d1 = distFuncTorus(q, vec2(1.5, 0.25));
-            float d2 = distFuncBox(q);
-            float d3 = distFuncCylinder(q, vec2(0.75, 0.25));
-            float d4 = distFuncFloor(p);
-            return min(smoothMin(smoothMin(d1, d2, 16.0), d3, 16.0), d4);
-        }
+// distance function
+float distFunc(vec3 p){
+    vec3 q = rotate(p, radians(time * 10.0), vec3(1.0, 0.5, 0.0));
+    float d1 = distFuncTorus(q, vec2(1.5, 0.25));
+    float d2 = distFuncBox(q);
+    float d3 = distFuncCylinder(q, vec2(0.75, 0.25));
 
-        vec3 getNormal(vec3 p){
-            float d = 0.0001;
-            return normalize(vec3(
-                distFunc(p + vec3(  d, 0.0, 0.0)) - distFunc(p + vec3( -d, 0.0, 0.0)),
-                distFunc(p + vec3(0.0,   d, 0.0)) - distFunc(p + vec3(0.0,  -d, 0.0)),
-                distFunc(p + vec3(0.0, 0.0,   d)) - distFunc(p + vec3(0.0, 0.0,  -d))
-            ));
-        }
+    return smoothMin(smoothMin(d1, d2, 16.0), d3, 16.0);
+}
 
-        void main(void) {
-            // fragment position
-            vec2 p = (gl_FragCoord.xy * 2.0 - resolution) / min(resolution.x, resolution.y);
+vec3 getNormal(vec3 p){
+    float d = 0.0001;
+    return normalize(vec3(
+        distFunc(p + vec3(  d, 0.0, 0.0)) - distFunc(p + vec3( -d, 0.0, 0.0)),
+        distFunc(p + vec3(0.0,   d, 0.0)) - distFunc(p + vec3(0.0,  -d, 0.0)),
+        distFunc(p + vec3(0.0, 0.0,   d)) - distFunc(p + vec3(0.0, 0.0,  -d))
+    ));
+}
 
-            // camera
-            vec3 cPos = vec3(0.0,  5.0,  5.0); // カメラの位置
+void main(void) {
 
-            // ray
-            vec3 ray = normalize(vec3(sin(fov) * p.x, sin(fov) * p.y, -cos(fov)));
+    // fragment position
+    vec2 p = (gl_FragCoord.xy * 2.0 - resolution) / min(resolution.x, resolution.y);
 
-            // marching loop
-            vec3  dPos = cPos;    // レイの先端位置
-            for (int i = 0; i < 256; i++) {
-                float distance = distFunc(dPos);
-                if (distance < 0.001) { break; }
-                dPos +=  ray * distance * 0.7;
-            }
+    // const vec3 lightDir = vec3(-0.577, 0.577, 0.577);
+    vec3 lightDir = vec3(mouse, 0.577);
 
-            // hit check
-            if (distFunc(dPos) < 0.001) {
-                vec3 normal = getNormal(dPos);
-                float diff = clamp(dot(lightDir, normal), 0.1, 1.0);
+    // camera
+    vec3 cPos = vec3(0.0, 0.0, 4.0); // カメラの位置
 
-                float u = 1.0 - floor(mod(dPos.x, 2.0));
-                float v = 1.0 - floor(mod(dPos.z, 2.0));
-                if ((u == 1.0 && v < 1.0) || (u < 1.0 && v == 1.0)) {
-                    diff *= 0.7;
-                }
+    // ray
+    vec3 ray = normalize(vec3(sin(fov) * p.x, sin(fov) * p.y, -cos(fov)));
 
-                gl_FragColor = vec4(vec3(diff), 1.0);
-            }
-        }
+    // marching loop
+    vec3  dPos = cPos;    // レイの先端位置
+    for (int i = 0; i < 256; i++) {
+        float distance = distFunc(dPos);
+        if (distance < 0.001) { break; }
+        dPos +=  ray * distance * 0.7;
+    }
+
+    // hit check
+    if (distFunc(dPos) < 0.001) {
+        vec3 normal = getNormal(dPos);
+        float diff = clamp(dot(lightDir, normal), 0.1, 1.0);
+
+        gl_FragColor = vec4(vec3(diff*1.4), 1.0);
+    }
+}
+
     |]
